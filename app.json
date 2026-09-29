@@ -1,0 +1,16 @@
+{
+  "expo": {
+    "name": "Face Consent Manager",
+    "slug": "face-consent-manager",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "scheme": "faceconsentmanager",
+    "android": {
+      "package": "com.consultit.faceconsentmanager"
+    },
+    "ios": {
+      "bundleIdentifier": "com.consultit.faceconsentmanager"
+    }
+  }
+}
