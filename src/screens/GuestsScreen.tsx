@@ -10,11 +10,11 @@ import {ActionButton, GuestAvatar, Header, Loading, StatusPill} from "../compone
 type ModalType = "manual"|"details"|"otp"|"merge"|null;
 type GuestTab = "all"|"opted_in"|"opted_out"|"pending";
 
-const guestTabs: {value: GuestTab; label: string}[] = [
-  {value: "all", label: "All"},
-  {value: "opted_in", label: "Opt In"},
-  {value: "opted_out", label: "Opt Out"},
-  {value: "pending", label: "Pending"},
+const guestTabs: {value: GuestTab; label: string; icon: keyof typeof Ionicons.glyphMap}[] = [
+  // {value: "all", label: "All", icon: "people-outline"},
+  {value: "opted_in", label: "Opt In", icon: "checkmark-circle-outline"},
+  {value: "opted_out", label: "Opt Out", icon: "ban-outline"},
+  {value: "pending", label: "Pending", icon: "time-outline"},
 ];
 
 export default function GuestsScreen() {
@@ -89,7 +89,7 @@ export default function GuestsScreen() {
     try {await guestsApi.verifyOtp(selected.guest_id!,otp);setModal(null);setOtp("");load();Alert.alert("Success","Consent confirmed.");}
     catch(e:any){Alert.alert("Verify OTP",e.message)}
   };
-
+ 
   const optOut=async(g:Guest)=>{
     Alert.alert("Opt Out","Delete this guest photo and face data?",[
       {text:"Cancel",style:"cancel"},
@@ -141,12 +141,35 @@ export default function GuestsScreen() {
       <TouchableOpacity onPress={async()=>{try{const r:any=await scannerApi.run();Alert.alert("Scanner",r.message||"Scan completed");load()}catch(e:any){Alert.alert("Scan",e.message)}}} style={styles.sync}><Ionicons name="refresh" size={20} color="#fff"/></TouchableOpacity>
     }/>
     <View style={styles.content}>
+      <View style={styles.heroCard}>
+        <View style={styles.heroBadge}><Ionicons name="sparkles" size={16} color={colors.primary}/></View>
+        <View style={{flex:1}}>
+          <Text style={styles.heroEyebrow}>Visitor pipeline</Text>
+          <Text style={styles.heroTitle}>Guest directory</Text>
+        </View>
+        <View style={styles.heroDot} />
+      </View>
+
+      <View style={styles.quickStatsRow}>
+        {[
+          {label:"Opt in", value:guestCounts.opted_in, tone:"green"},
+          {label:"Opt out", value:guestCounts.opted_out, tone:"red"},
+          {label:"Pending", value:guestCounts.pending, tone:"amber"}
+        ].map((stat)=> (
+          <View key={stat.label} style={[styles.stat, {backgroundColor: stat.tone === "green" ? "#EAFBF2" : stat.tone === "red" ? "#FDECEC" : "#FFF7D9"}]}> 
+            <Text style={[styles.statValue, {color: stat.tone === "green" ? colors.green : stat.tone === "red" ? colors.red : "#B57A15"}]}>{stat.value}</Text>
+            <Text style={styles.statLabel}>{stat.label}</Text>
+          </View>
+        ))}
+      </View>
+
       <View style={styles.search}><Ionicons name="search" size={22} color="#8D96A6"/><TextInput value={query} onChangeText={setQuery} placeholder="Search guest by name or ID..." placeholderTextColor="#9AA3B2" style={styles.searchInput}/></View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
-        {guestTabs.map(({value,label})=>{
+        {guestTabs.map(({value,label,icon})=>{
           const active=tab===value;
           const count=guestCounts[value];
-          return <TouchableOpacity key={value} onPress={()=>setTab(value)} accessibilityRole="tab" accessibilityState={{ selected: active }} accessibilityLabel={`${label} tab, ${count} guests`} style={[styles.tab,{backgroundColor:active?colors.primary:colors.white,borderColor:active?colors.primary:colors.border}]}>
+          return <TouchableOpacity key={value} onPress={()=>setTab(value)} accessibilityRole="tab" accessibilityState={{ selected: active }} accessibilityLabel={`${label} tab, ${count} guests`} style={[styles.tab,{backgroundColor:active?colors.primary:colors.white,borderColor:active?colors.primary:colors.border}]}> 
+            <Ionicons name={icon} size={15} color={active ? "#fff" : colors.text} />
             <Text style={[styles.tabText,{color:active?"#fff":colors.text}]}>{label} ({count})</Text>
           </TouchableOpacity>
         })}
@@ -182,10 +205,41 @@ export default function GuestsScreen() {
   </View>
 }
 const styles=StyleSheet.create({
- screen:{flex:1,backgroundColor:colors.bg},content:{flex:1},sync:{width:43,height:43,borderRadius:22,backgroundColor:"rgba(255,255,255,.15)",alignItems:"center",justifyContent:"center"},
- search:{margin:16,marginBottom:10,height:56,borderRadius:29,backgroundColor:"#fff",borderWidth:1,borderColor:colors.border,flexDirection:"row",alignItems:"center",paddingHorizontal:18},
- searchInput:{flex:1,fontSize:16,color:colors.text,marginLeft:8},tabs:{paddingHorizontal:16,gap:9,paddingBottom:12},tab:{paddingHorizontal:19,paddingVertical:11,borderRadius:24,borderWidth:1},tabText:{fontWeight:"800",fontSize:14},
- card:{backgroundColor:"#fff",marginHorizontal:16,marginBottom:14,borderRadius:22,padding:18,borderWidth:1,borderColor:"#DFE4ED",shadowColor:"#000",shadowOpacity:.04,shadowRadius:6,elevation:1},row:{flexDirection:"row",alignItems:"flex-start"},name:{fontSize:22,fontWeight:"900",color:colors.text},meta:{fontSize:13,color:colors.muted,marginTop:5},id:{fontSize:12,color:"#647084",backgroundColor:"#F0F3F7",paddingHorizontal:9,paddingVertical:6,borderRadius:15,fontWeight:"700"},divider:{height:1,backgroundColor:"#E5E8EE",marginVertical:12},actionsRow:{flexDirection:"row",gap:7},empty:{alignItems:"center",padding:55},emptyTitle:{fontSize:20,fontWeight:"800",color:colors.text,marginTop:10},emptyText:{color:colors.muted,textAlign:"center",marginTop:6},
+ screen:{flex:1,backgroundColor:colors.bg},
+ content:{flex:1},
+ sync:{width:43,height:43,borderRadius:22,backgroundColor:"rgba(255,255,255,.15)",alignItems:"center",justifyContent:"center"},
+ heroCard:{marginHorizontal:16,marginTop:16,marginBottom:10,backgroundColor:"#fff",borderRadius:24,paddingHorizontal:18,paddingVertical:16,borderWidth:1,borderColor:"#E5EAF5",flexDirection:"row",alignItems:"center",shadowColor:"#1A1D2A",shadowOpacity:.05,shadowRadius:10,elevation:2},
+ heroBadge:{width:42,height:42,borderRadius:16,backgroundColor:"#EEF2FF",alignItems:"center",justifyContent:"center",marginRight:12},
+ heroEyebrow:{fontSize:11,color:colors.muted,textTransform:"uppercase",letterSpacing:1.2,fontWeight:"800"},
+ heroTitle:{fontSize:22,fontWeight:"900",color:colors.text,marginTop:2},
+ heroDot:{width:12,height:12,borderRadius:6,backgroundColor:colors.green,marginLeft:10},
+ quickStatsRow:{marginHorizontal:16,marginBottom:10,flexDirection:"row",gap:10},
+ stat:{flex:1,borderRadius:18,paddingVertical:12,paddingHorizontal:12,borderWidth:1,borderColor:"rgba(59,67,94,0.05)"},
+ statValue:{fontSize:22,fontWeight:"900",lineHeight:26},
+ statLabel:{fontSize:12,color:colors.muted,marginTop:4,fontWeight:"700"},
+ search:{marginHorizontal:16,marginBottom:12,height:56,borderRadius:29,backgroundColor:"#fff",borderWidth:1,borderColor:colors.border,flexDirection:"row",alignItems:"center",paddingHorizontal:18,shadowColor:"#000",shadowOpacity:.02,shadowRadius:6,elevation:1},
+ searchInput:{flex:1,fontSize:16,color:colors.text,marginLeft:8},
+ tabs:{paddingHorizontal:16,gap:9,paddingBottom:12},
+ tab:{paddingHorizontal:16,paddingVertical:11,borderRadius:24,borderWidth:1,flexDirection:"row",alignItems:"center",gap:6},
+ tabText:{fontWeight:"800",fontSize:14},
+ card:{backgroundColor:"#fff",marginHorizontal:16,marginBottom:14,borderRadius:24,padding:18,borderWidth:1,borderColor:"#E7ECF4",shadowColor:"#000",shadowOpacity:.04,shadowRadius:10,elevation:2},
+ row:{flexDirection:"row",alignItems:"flex-start"},
+ name:{fontSize:22,fontWeight:"900",color:colors.text},
+ meta:{fontSize:13,color:colors.muted,marginTop:5},
+ id:{fontSize:12,color:"#647084",backgroundColor:"#F0F3F7",paddingHorizontal:9,paddingVertical:6,borderRadius:15,fontWeight:"700"},
+ divider:{height:1,backgroundColor:"#E5E8EE",marginVertical:12},
+ actionsRow:{flexDirection:"row",gap:7},
+ empty:{alignItems:"center",padding:55},
+ emptyTitle:{fontSize:20,fontWeight:"800",color:colors.text,marginTop:10},
+ emptyText:{color:colors.muted,textAlign:"center",marginTop:6},
  fab:{position:"absolute",right:22,bottom:22,width:62,height:62,borderRadius:20,backgroundColor:colors.primary,alignItems:"center",justifyContent:"center",elevation:8,shadowColor:"#000",shadowOpacity:.2,shadowRadius:8},
- overlay:{flex:1,backgroundColor:"rgba(0,0,0,.45)",justifyContent:"flex-end"},modal:{backgroundColor:"#fff",borderTopLeftRadius:28,borderTopRightRadius:28,padding:22,paddingBottom:34},modalHead:{flexDirection:"row",justifyContent:"space-between",alignItems:"center",marginBottom:18},modalTitle:{fontSize:23,fontWeight:"900",color:colors.text},label:{fontSize:13,fontWeight:"800",color:colors.text,marginBottom:6},input:{height:52,borderWidth:1,borderColor:colors.border,borderRadius:13,paddingHorizontal:14,fontSize:16,color:colors.text,marginBottom:14},primaryBtn:{height:52,borderRadius:14,backgroundColor:colors.primary,alignItems:"center",justifyContent:"center",marginTop:4},primaryText:{color:"#fff",fontSize:16,fontWeight:"900"},hint:{color:colors.muted,fontSize:13,lineHeight:19,marginTop:10,marginBottom:10}
+ overlay:{flex:1,backgroundColor:"rgba(0,0,0,.45)",justifyContent:"flex-end"},
+ modal:{backgroundColor:"#fff",borderTopLeftRadius:28,borderTopRightRadius:28,padding:22,paddingBottom:34},
+ modalHead:{flexDirection:"row",justifyContent:"space-between",alignItems:"center",marginBottom:18},
+ modalTitle:{fontSize:23,fontWeight:"900",color:colors.text},
+ label:{fontSize:13,fontWeight:"800",color:colors.text,marginBottom:6},
+ input:{height:52,borderWidth:1,borderColor:colors.border,borderRadius:13,paddingHorizontal:14,fontSize:16,color:colors.text,marginBottom:14},
+ primaryBtn:{height:52,borderRadius:14,backgroundColor:colors.primary,alignItems:"center",justifyContent:"center",marginTop:4},
+ primaryText:{color:"#fff",fontSize:16,fontWeight:"900"},
+ hint:{color:colors.muted,fontSize:13,lineHeight:19,marginTop:10,marginBottom:10}
 });
