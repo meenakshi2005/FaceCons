@@ -1,9 +1,10 @@
 import React, {useCallback, useEffect, useMemo, useState} from "react";
-import {Alert, Modal, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View} from "react-native";
+import {ActivityIndicator, Alert, Modal, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View} from "react-native";
 import {Ionicons} from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 import {useNavigation} from "@react-navigation/native";
 import {colors} from "../theme";
-import {guestsApi, scannerApi} from "../api";
+import {guestsApi, photoUrl, scannerApi} from "../api";
 import {Guest} from "../types";
 import {ActionButton, GuestAvatar, Header, Loading, StatusPill} from "../components";
 
@@ -11,7 +12,7 @@ type ModalType = "manual"|"details"|"otp"|"merge"|null;
 type GuestTab = "all"|"opted_in"|"opted_out"|"pending";
 
 const guestTabs: {value: GuestTab; label: string; icon: keyof typeof Ionicons.glyphMap}[] = [
-  // {value: "all", label: "All", icon: "people-outline"},
+  {value: "all", label: "All", icon: "people-outline"},
   {value: "opted_in", label: "Opt In", icon: "checkmark-circle-outline"},
   {value: "opted_out", label: "Opt Out", icon: "ban-outline"},
   {value: "pending", label: "Pending", icon: "time-outline"},
@@ -30,6 +31,7 @@ export default function GuestsScreen() {
   const [phone,setPhone] = useState("");
   const [otp,setOtp] = useState("");
   const [existingId,setExistingId] = useState("");
+  const [updatingPhoto, setUpdatingPhoto] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -110,11 +112,138 @@ export default function GuestsScreen() {
     catch(e:any){Alert.alert("Merge",e.message)}
   };
 
+  const handlePickPhoto = async (g: Guest, source: "camera" | "library") => {
+    const id = g.guest_id || g._id;
+    if (!id) return;
+
+    if (g.consent_status === "opted_out") {
+      Alert.alert("Photo Not Allowed", "This guest has opted out. Photos cannot be stored for opted-out guests.");
+      return;
+    }
+
+    try {
+      if (source === "camera") {
+        const perm = await ImagePicker.requestCameraPermissionsAsync();
+        if (!perm.granted) {
+          Alert.alert("Permission Required", "Camera permission is required to capture photos.");
+          return;
+        }
+      } else {
+        const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!perm.granted) {
+          Alert.alert("Permission Required", "Photo library access is required to choose photos.");
+          return;
+        }
+      }
+
+      const pickerOptions: ImagePicker.ImagePickerOptions = {
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+        base64: true,
+      };
+
+      const result = source === "camera"
+        ? await ImagePicker.launchCameraAsync(pickerOptions)
+        : await ImagePicker.launchImageLibraryAsync(pickerOptions);
+
+      if (result.canceled || !result.assets || !result.assets[0]) {
+        return;
+      }
+
+      const asset = result.assets[0];
+      if (!asset.base64) {
+        Alert.alert("Error", "Could not process selected image.");
+        return;
+      }
+
+      const mimeType = asset.mimeType || "image/jpeg";
+      const photo_base64 = asset.base64.startsWith("data:")
+        ? asset.base64
+        : `data:${mimeType};base64,${asset.base64}`;
+
+      setUpdatingPhoto(id);
+
+      await guestsApi.replacePhoto(id, { photo_base64 });
+
+      const now = Date.now();
+      setGuests(prev => prev.map(item => {
+        if ((item.guest_id || item._id) === id) {
+          return {
+            ...item,
+            photo_url: photoUrl(id, now),
+            photo_updated_at: now,
+          };
+        }
+        return item;
+      }));
+
+      Alert.alert("Success", "Guest photo updated successfully.");
+    } catch (e: any) {
+      const msg = e.message || "";
+      if (msg.includes("409") || g.consent_status === "opted_out") {
+        Alert.alert("Photo Not Allowed", "Guest has opted out. Photos cannot be stored.");
+      } else if (msg.includes("400") || msg.toLowerCase().includes("face")) {
+        Alert.alert("No Face Detected", "No face was detected or file type is unsupported. Please upload a clear photo of the guest's face.");
+      } else if (msg.includes("404")) {
+        Alert.alert("Guest Not Found", "Guest could not be found on server.");
+      } else {
+        Alert.alert("Upload Failed", msg || "Failed to update guest photo.");
+      }
+    } finally {
+      setUpdatingPhoto(null);
+    }
+  };
+
+  const promptReplacePhoto = (g: Guest) => {
+    if (g.consent_status === "opted_out") {
+      Alert.alert("Photo Not Allowed", "This guest has opted out. Photos cannot be stored for opted-out guests.");
+      return;
+    }
+
+    Alert.alert(
+      "Replace Photo",
+      `Choose how you would like to update the photo for ${g.name || `#${g.guest_id || g._id}`}:`,
+      [
+        {
+          text: "Camera",
+          onPress: () => handlePickPhoto(g, "camera"),
+        },
+        {
+          text: "Photo Library",
+          onPress: () => handlePickPhoto(g, "library"),
+        },
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+      ]
+    );
+  };
+
   const card=(g:Guest,index:number)=>{
     const id=g.guest_id || g._id || `guest-${index}`;
+    const isUpdating = updatingPhoto === id;
     return <View style={styles.card} key={id}>
       <View style={styles.row}>
-        <GuestAvatar guest={g} size={82}/>
+        <TouchableOpacity
+          activeOpacity={0.75}
+          onPress={() => promptReplacePhoto(g)}
+          style={styles.avatarWrapper}
+          accessibilityLabel="Replace guest photo"
+        >
+          <GuestAvatar guest={g} size={82} cacheKey={g.photo_updated_at}/>
+          {isUpdating ? (
+            <View style={styles.avatarLoadingOverlay}>
+              <ActivityIndicator size="small" color="#fff" />
+            </View>
+          ) : (
+            <View style={styles.cameraBadge}>
+              <Ionicons name="camera" size={13} color="#fff" />
+            </View>
+          )}
+        </TouchableOpacity>
         <View style={{flex:1,marginLeft:14}}>
           <Text style={styles.name}>{g.name || "Unnamed guest"}</Text>
           <Text style={styles.meta}>📱 {g.phone || "No phone"}</Text>
@@ -129,7 +258,14 @@ export default function GuestsScreen() {
         <ActionButton label="Opt Out" icon="ban" color={colors.red} onPress={()=>optOut(g)}/>
         <ActionButton label="History" icon="time-outline" color={colors.primary} outline onPress={()=>navigation.navigate("GuestHistory",{guest:g})}/>
       </View>
-      <View style={[styles.actionsRow,{marginTop:8}]}>
+      <View style={[styles.actionsRow,{marginTop:6}]}>
+        <ActionButton
+          label={isUpdating ? "Saving…" : "Photo"}
+          icon="camera-outline"
+          color="#2563EB"
+          disabled={isUpdating}
+          onPress={() => promptReplacePhoto(g)}
+        />
         <ActionButton label="Merge" icon="git-merge-outline" color={colors.purple} onPress={()=>{setSelected(g);setExistingId("");setModal("merge")}}/>
         <ActionButton label="Table" icon="grid-outline" color={colors.teal} onPress={()=>navigation.navigate("TableDetails",{guest:g})}/>
       </View>
@@ -141,44 +277,94 @@ export default function GuestsScreen() {
       <TouchableOpacity onPress={async()=>{try{const r:any=await scannerApi.run();Alert.alert("Scanner",r.message||"Scan completed");load()}catch(e:any){Alert.alert("Scan",e.message)}}} style={styles.sync}><Ionicons name="refresh" size={20} color="#fff"/></TouchableOpacity>
     }/>
     <View style={styles.content}>
-      <View style={styles.heroCard}>
-        <View style={styles.heroBadge}><Ionicons name="sparkles" size={16} color={colors.primary}/></View>
-        <View style={{flex:1}}>
-          <Text style={styles.heroEyebrow}>Visitor pipeline</Text>
-          <Text style={styles.heroTitle}>Guest directory</Text>
-        </View>
-        <View style={styles.heroDot} />
-      </View>
-
-      <View style={styles.quickStatsRow}>
-        {[
-          {label:"Opt in", value:guestCounts.opted_in, tone:"green"},
-          {label:"Opt out", value:guestCounts.opted_out, tone:"red"},
-          {label:"Pending", value:guestCounts.pending, tone:"amber"}
-        ].map((stat)=> (
-          <View key={stat.label} style={[styles.stat, {backgroundColor: stat.tone === "green" ? "#EAFBF2" : stat.tone === "red" ? "#FDECEC" : "#FFF7D9"}]}> 
-            <Text style={[styles.statValue, {color: stat.tone === "green" ? colors.green : stat.tone === "red" ? colors.red : "#B57A15"}]}>{stat.value}</Text>
-            <Text style={styles.statLabel}>{stat.label}</Text>
-          </View>
-        ))}
-      </View>
-
       <View style={styles.search}><Ionicons name="search" size={22} color="#8D96A6"/><TextInput value={query} onChangeText={setQuery} placeholder="Search guest by name or ID..." placeholderTextColor="#9AA3B2" style={styles.searchInput}/></View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
-        {guestTabs.map(({value,label,icon})=>{
-          const active=tab===value;
-          const count=guestCounts[value];
-          return <TouchableOpacity key={value} onPress={()=>setTab(value)} accessibilityRole="tab" accessibilityState={{ selected: active }} accessibilityLabel={`${label} tab, ${count} guests`} style={[styles.tab,{backgroundColor:active?colors.primary:colors.white,borderColor:active?colors.primary:colors.border}]}> 
-            <Ionicons name={icon} size={15} color={active ? "#fff" : colors.text} />
-            <Text style={[styles.tabText,{color:active?"#fff":colors.text}]}>{label} ({count})</Text>
-          </TouchableOpacity>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.tabsScrollView}
+        contentContainerStyle={styles.tabs}
+      >
+        {guestTabs.map(({value, label, icon}) => {
+          const active = tab === value;
+          const count = guestCounts[value] ?? 0;
+          return (
+            <TouchableOpacity
+              key={value}
+              onPress={() => setTab(value)}
+              activeOpacity={0.75}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: active }}
+              accessibilityLabel={`${label} tab, ${count} guests`}
+              style={[
+                styles.tab,
+                active ? styles.tabActive : styles.tabInactive,
+              ]}
+            >
+              <Ionicons
+                name={icon}
+                size={16}
+                color={active ? "#fff" : colors.muted}
+              />
+              <Text
+                style={[
+                  styles.tabText,
+                  {color: active ? "#fff" : colors.text},
+                ]}
+              >
+                {label}
+              </Text>
+              <View
+                style={[
+                  styles.tabBadge,
+                  {
+                    backgroundColor: active
+                      ? "rgba(255, 255, 255, 0.22)"
+                      : "#EBF0F7",
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.tabBadgeText,
+                    {color: active ? "#fff" : colors.muted},
+                  ]}
+                >
+                  {count}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          );
         })}
       </ScrollView>
-      {loading ? <Loading text="Loading guests..."/> :
-        <ScrollView refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>{setRefreshing(true);load()}}/>} contentContainerStyle={{paddingBottom:110}}>
-          {filtered.length ? filtered.map(card) : <View style={styles.empty}><Ionicons name="people-outline" size={52} color="#A7B0C0"/><Text style={styles.emptyTitle}>No guests found</Text><Text style={styles.emptyText}>Try another search or add a guest manually.</Text></View>}
+      {loading ? (
+        <Loading text="Loading guests..." />
+      ) : (
+        <ScrollView
+          style={styles.listScrollView}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => {
+                setRefreshing(true);
+                load();
+              }}
+            />
+          }
+          contentContainerStyle={{paddingBottom: 110}}
+        >
+          {filtered.length ? (
+            filtered.map(card)
+          ) : (
+            <View style={styles.empty}>
+              <Ionicons name="people-outline" size={52} color="#A7B0C0" />
+              <Text style={styles.emptyTitle}>No guests found</Text>
+              <Text style={styles.emptyText}>
+                Try another search or add a guest manually.
+              </Text>
+            </View>
+          )}
         </ScrollView>
-      }
+      )}
     </View>
     <TouchableOpacity onPress={openManual} style={styles.fab}><Ionicons name="add" size={32} color="#fff"/></TouchableOpacity>
     <Modal visible={modal!==null} transparent animationType="slide" onRequestClose={()=>setModal(null)}>
@@ -208,27 +394,27 @@ const styles=StyleSheet.create({
  screen:{flex:1,backgroundColor:colors.bg},
  content:{flex:1},
  sync:{width:43,height:43,borderRadius:22,backgroundColor:"rgba(255,255,255,.15)",alignItems:"center",justifyContent:"center"},
- heroCard:{marginHorizontal:16,marginTop:16,marginBottom:10,backgroundColor:"#fff",borderRadius:24,paddingHorizontal:18,paddingVertical:16,borderWidth:1,borderColor:"#E5EAF5",flexDirection:"row",alignItems:"center",shadowColor:"#1A1D2A",shadowOpacity:.05,shadowRadius:10,elevation:2},
- heroBadge:{width:42,height:42,borderRadius:16,backgroundColor:"#EEF2FF",alignItems:"center",justifyContent:"center",marginRight:12},
- heroEyebrow:{fontSize:11,color:colors.muted,textTransform:"uppercase",letterSpacing:1.2,fontWeight:"800"},
- heroTitle:{fontSize:22,fontWeight:"900",color:colors.text,marginTop:2},
- heroDot:{width:12,height:12,borderRadius:6,backgroundColor:colors.green,marginLeft:10},
- quickStatsRow:{marginHorizontal:16,marginBottom:10,flexDirection:"row",gap:10},
- stat:{flex:1,borderRadius:18,paddingVertical:12,paddingHorizontal:12,borderWidth:1,borderColor:"rgba(59,67,94,0.05)"},
- statValue:{fontSize:22,fontWeight:"900",lineHeight:26},
- statLabel:{fontSize:12,color:colors.muted,marginTop:4,fontWeight:"700"},
- search:{marginHorizontal:16,marginBottom:12,height:56,borderRadius:29,backgroundColor:"#fff",borderWidth:1,borderColor:colors.border,flexDirection:"row",alignItems:"center",paddingHorizontal:18,shadowColor:"#000",shadowOpacity:.02,shadowRadius:6,elevation:1},
+ search:{margin:16,marginBottom:12,height:56,borderRadius:29,backgroundColor:"#fff",borderWidth:1,borderColor:colors.border,flexDirection:"row",alignItems:"center",paddingHorizontal:18,shadowColor:"#000",shadowOpacity:.02,shadowRadius:6,elevation:1},
  searchInput:{flex:1,fontSize:16,color:colors.text,marginLeft:8},
- tabs:{paddingHorizontal:16,gap:9,paddingBottom:12},
- tab:{paddingHorizontal:16,paddingVertical:11,borderRadius:24,borderWidth:1,flexDirection:"row",alignItems:"center",gap:6},
- tabText:{fontWeight:"800",fontSize:14},
+ tabsScrollView:{flexGrow:0,flexShrink:0,marginBottom:8},
+ tabs:{paddingHorizontal:16,gap:8,paddingVertical:4,alignItems:"center"},
+ tab:{flexDirection:"row",alignItems:"center",paddingHorizontal:14,paddingVertical:8,borderRadius:22,borderWidth:1.5,gap:6},
+ tabActive:{backgroundColor:colors.primary,borderColor:colors.primary,shadowColor:colors.primary,shadowOffset:{width:0,height:2},shadowOpacity:.22,shadowRadius:4,elevation:3},
+ tabInactive:{backgroundColor:colors.white,borderColor:colors.border},
+ tabText:{fontWeight:"700",fontSize:13.5},
+ tabBadge:{paddingHorizontal:7,paddingVertical:2,borderRadius:12},
+ tabBadgeText:{fontSize:12,fontWeight:"800"},
+ listScrollView:{flex:1},
  card:{backgroundColor:"#fff",marginHorizontal:16,marginBottom:14,borderRadius:24,padding:18,borderWidth:1,borderColor:"#E7ECF4",shadowColor:"#000",shadowOpacity:.04,shadowRadius:10,elevation:2},
  row:{flexDirection:"row",alignItems:"flex-start"},
+ avatarWrapper:{width:82,height:82,position:"relative"},
+ cameraBadge:{position:"absolute",right:-3,bottom:-3,backgroundColor:colors.primary,width:25,height:25,borderRadius:13,borderWidth:2,borderColor:"#fff",alignItems:"center",justifyContent:"center",shadowColor:"#000",shadowOpacity:.2,shadowRadius:3,elevation:3},
+ avatarLoadingOverlay:{...StyleSheet.absoluteFill,borderRadius:12,backgroundColor:"rgba(0,0,0,0.5)",alignItems:"center",justifyContent:"center"},
  name:{fontSize:22,fontWeight:"900",color:colors.text},
  meta:{fontSize:13,color:colors.muted,marginTop:5},
  id:{fontSize:12,color:"#647084",backgroundColor:"#F0F3F7",paddingHorizontal:9,paddingVertical:6,borderRadius:15,fontWeight:"700"},
- divider:{height:1,backgroundColor:"#E5E8EE",marginVertical:12},
- actionsRow:{flexDirection:"row",gap:7},
+ divider:{height:1,backgroundColor:"#E5E8EE",marginVertical:10},
+ actionsRow:{flexDirection:"row",gap:6},
  empty:{alignItems:"center",padding:55},
  emptyTitle:{fontSize:20,fontWeight:"800",color:colors.text,marginTop:10},
  emptyText:{color:colors.muted,textAlign:"center",marginTop:6},

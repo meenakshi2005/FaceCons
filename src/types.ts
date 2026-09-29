@@ -5,6 +5,7 @@ export type Guest = {
   phone?: string | null;
   consent_status?: "pending" | "opted_in" | "opted_out" | string;
   photo_url?: string | null;
+  photo_updated_at?: number | string;
   arrived_at?: string;
   created_at?: string;
   [key: string]: any;

@@ -349,6 +349,10 @@ html, body {
   color: var(--text-sub);
   border: 1.5px solid var(--gray-border);
   box-shadow: var(--shadow-sm);
+.btn-photo {
+  background: linear-gradient(135deg, #1e88e5, #1565c0);
+  color: #fff;
+  box-shadow: 0 3px 10px rgba(30,136,229,.35);
 }
 .btn-merge {
   background: linear-gradient(135deg, #8e24aa, #6a1b9a);

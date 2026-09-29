@@ -48,8 +48,8 @@ export async function api<T = any>(path: string, options: RequestOptions = {}): 
   }
 }
 
-export const photoUrl = (guestId: string) =>
-  `${BASE_URL}/guests/${encodeURIComponent(guestId)}/photo`;
+export const photoUrl = (guestId: string, timestamp?: number | string) =>
+  `${BASE_URL}/guests/${encodeURIComponent(guestId)}/photo${timestamp ? `?t=${timestamp}` : ""}`;
 
 export const employeePhotoUrl = (employeeId: string) =>
   `${BASE_URL}/employees/${encodeURIComponent(employeeId)}/photo`;

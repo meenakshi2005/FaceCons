@@ -109,8 +109,8 @@ function render() {
 
 function buildCard(g) {
   const photoHtml = g.photo
-    ? `<img class="guest-photo" src="${g.photo}" alt="Guest photo" onerror="this.replaceWith(makePlaceholder())" />`
-    : `<div class="guest-photo-placeholder">
+    ? `<img class="guest-photo" src="${g.photo}" alt="Guest photo" onclick="handleReplacePhoto('${g.id}')" title="Click to replace photo" style="cursor:pointer" onerror="this.replaceWith(makePlaceholder())" />`
+    : `<div class="guest-photo-placeholder" onclick="handleReplacePhoto('${g.id}')" title="Click to upload photo" style="cursor:pointer">
          <svg width="34" height="34" viewBox="0 0 24 24" fill="#6366f1">
            <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/>
          </svg>
@@ -174,6 +174,10 @@ function buildCard(g) {
     </div>
 
     <div class="card-actions-row2">
+      <button class="btn btn-photo" id="photo-${g.id}" onclick="handleReplacePhoto('${g.id}')" aria-label="Photo ${g.id}">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="white"><path d="M12 12c1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3 1.34 3 3 3zm0-4.5c.83 0 1.5.67 1.5 1.5s-.67 1.5-1.5 1.5-1.5-.67-1.5-1.5.67-1.5 1.5-1.5z"/><path d="M9 2L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9zm3 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/></svg>
+        Photo
+      </button>
       <button class="btn btn-merge" id="merge-${g.id}" onclick="handleMerge('${g.id}')" aria-label="Merge ${g.id}">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="white"><path d="M17 20.41 18.41 19 15 15.59 13.59 17 17 20.41zM7.5 8H11v5.59L5.59 19 7 20.41l6-6V8h3.5L12 3.5 7.5 8z"/></svg>
         Merge
@@ -224,6 +228,30 @@ function handleOptOut(id) {
 
 function handleHistory(id) {
   showToast(`📋 Viewing history for #${id}`);
+}
+
+function handleReplacePhoto(id) {
+  const g = GUESTS.find(x => x.id === id);
+  if (!g) return;
+  if (g.status === "optout") {
+    showToast("⚠️ Guest has opted out. Photo cannot be stored.");
+    return;
+  }
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = "image/*";
+  input.onchange = (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      g.photo = reader.result;
+      showToast(`📸 Photo updated for ${g.name}`);
+      render();
+    };
+    reader.readAsDataURL(file);
+  };
+  input.click();
 }
 
 function handleMerge(id) {

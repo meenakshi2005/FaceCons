@@ -39,12 +39,14 @@ export function StatusPill({status}: {status?: string}) {
 interface GuestAvatarProps {
   guest: Guest;
   size?: number;
+  cacheKey?: number | string;
 }
 
-export function GuestAvatar({guest, size = 82}: GuestAvatarProps) {
+export function GuestAvatar({guest, size = 82, cacheKey}: GuestAvatarProps) {
   const id = guest.guest_id || guest._id;
-  return id && guest.photo_url !== null ? (
-    <Image source={{uri: photoUrl(id)}} style={{width:size, height:size, borderRadius:12, backgroundColor:"#E8ECF3"}}/>
+  const url = id ? photoUrl(id, cacheKey || guest.photo_updated_at) : null;
+  return id && guest.photo_url !== null && url ? (
+    <Image source={{uri: url}} style={{width:size, height:size, borderRadius:12, backgroundColor:"#E8ECF3"}}/>
   ) : (
     <View style={[styles.avatar, {width:size, height:size, borderRadius:12}]}><Ionicons name="person" size={size * .43} color="#8B95A7"/></View>
   );
@@ -60,8 +62,8 @@ interface ActionButtonProps {
 }
 
 export function ActionButton({label, icon, color, onPress, outline=false, disabled=false}: ActionButtonProps) {
-  return <TouchableOpacity disabled={disabled} onPress={onPress} style={[styles.action, {backgroundColor: outline ? colors.blueSoft : color, borderColor: outline ? "#C7D1F0" : color, opacity: disabled ? .5 : 1}]}>
-    <Ionicons name={icon} size={17} color={outline ? colors.primaryDark : "#fff"}/>
+  return <TouchableOpacity disabled={disabled} onPress={onPress} activeOpacity={0.75} style={[styles.action, {backgroundColor: outline ? colors.blueSoft : color, borderColor: outline ? "#C7D1F0" : color, opacity: disabled ? .5 : 1}]}>
+    <Ionicons name={icon} size={15} color={outline ? colors.primaryDark : "#fff"}/>
     <Text style={[styles.actionText, {color: outline ? colors.primaryDark : "#fff"}]}>{label}</Text>
   </TouchableOpacity>
 }
@@ -86,8 +88,8 @@ const styles = StyleSheet.create({
   out:{backgroundColor:colors.red,borderColor:colors.red},
   statusText:{fontSize:12,fontWeight:"900"},
   avatar:{backgroundColor:"#E8ECF3",alignItems:"center",justifyContent:"center"},
-  action:{height:48,borderRadius:13,borderWidth:1,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:6,flex:1},
-  actionText:{fontWeight:"800",fontSize:14},
+  action:{height:36,borderRadius:10,borderWidth:1,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:5,flex:1,paddingHorizontal:6},
+  actionText:{fontWeight:"700",fontSize:12.5},
   loading:{padding:50,alignItems:"center",gap:12},
   muted:{color:colors.muted,fontSize:13}
 });
