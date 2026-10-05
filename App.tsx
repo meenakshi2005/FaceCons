@@ -13,6 +13,7 @@ import EmployeesScreen from "./src/screens/EmployeesScreen";
 import MoreScreen from "./src/screens/MoreScreen";
 import GuestHistoryScreen from "./src/screens/GuestHistoryScreen";
 import TableScreen from "./src/screens/TableScreen";
+import ViewTableScreen from "./src/screens/ViewTableScreen";
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -48,6 +49,7 @@ function AppStack() {
       <Stack.Screen name="HomeTabs" component={Tabs} options={{headerShown: false}}/>
       <Stack.Screen name="GuestHistory" component={GuestHistoryScreen} options={{title: "Guest History"}}/>
       <Stack.Screen name="TableDetails" component={TableScreen} options={{title: "Table"}}/>
+      <Stack.Screen name="ViewTable" component={ViewTableScreen} options={{title: "View Table"}}/>
     </Stack.Navigator>
   );
 }

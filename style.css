@@ -152,11 +152,11 @@ html, body {
 }
 .search-input {
   width: 100%;
-  padding: 13px 14px 13px 44px;
+  padding: 13px 12px 13px 30px;
   border-radius: var(--radius-pill);
   border: 1.5px solid var(--gray-border);
   background: var(--card-bg);
-  font-size: 14px;
+  font-size: 10px;
   font-family: var(--font);
   color: var(--text-main);
   outline: none;
@@ -469,4 +469,4 @@ html, body {
     border-radius: 0;
     box-shadow: none;
   }
-}
+}}

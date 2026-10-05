@@ -31,7 +31,7 @@ export function StatusPill({status}: {status?: string}) {
   const optedIn = status === "opted_in";
   return <View style={[styles.status, pending ? styles.pending : optedIn ? styles.in : styles.out]}>
     <Text style={[styles.statusText, {color: pending ? colors.pendingText : colors.white}]}>
-      {pending ? "? PENDING" : optedIn ? "✓ OPTED IN" : "⊘ OPTED OUT"}
+      {pending ? "PENDING" : optedIn ? "OPTED IN" : "OPTED OUT"}
     </Text>
   </View>;
 }
@@ -77,7 +77,7 @@ export function Loading({text="Loading..."}: LoadingProps) {
 }
 
 const styles = StyleSheet.create({
-  header:{backgroundColor:colors.primary, paddingHorizontal:18, paddingTop:10, paddingBottom:16, borderBottomLeftRadius:28, borderBottomRightRadius:28},
+  header:{backgroundColor:colors.primary, paddingHorizontal:18, paddingTop:60, paddingBottom:16, borderBottomLeftRadius:28, borderBottomRightRadius:28},
   headerTop:{flexDirection:"row", alignItems:"center", gap:10},
   shield:{width:48,height:48,borderRadius:16,backgroundColor:"rgba(255,255,255,.14)",alignItems:"center",justifyContent:"center"},
   title:{fontSize:23,fontWeight:"800",color:"#fff"},

@@ -8,6 +8,7 @@ export type Guest = {
   photo_updated_at?: number | string;
   arrived_at?: string;
   created_at?: string;
+  currently_at_table?: string | null;
   [key: string]: any;
 };
 
