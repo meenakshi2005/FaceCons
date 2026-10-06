@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Modal, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, Modal, RefreshControl, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
@@ -28,6 +28,7 @@ export default function GuestsScreen() {
   const [selected, setSelected] = useState<Guest | null>(null);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [forceMerge, setForceMerge] = useState(true);
   const [otp, setOtp] = useState("");
   const [existingId, setExistingId] = useState("");
   const [updatingPhoto, setUpdatingPhoto] = useState<string | null>(null);
@@ -110,8 +111,9 @@ export default function GuestsScreen() {
   };
 
   const merge = async () => {
-    if (!selected || !existingId.trim()) return;
-    try { await guestsApi.merge(selected.guest_id!, existingId.trim()); setModal(null); load(); Alert.alert("Merged", "Duplicate guest merged successfully."); }
+    if (!selected || !existingId.trim()) return Alert.alert("Validation", "Enter the existing guest ID to keep.");
+    if (!/^\d{10}$/.test(phone)) return Alert.alert("Validation", "Enter a valid 10-digit phone number.");
+    try { await guestsApi.merge(selected.guest_id!, { existing_guest_id: existingId.trim(), force: forceMerge, phone }); setModal(null); load(); Alert.alert("Merged", "Duplicate guest merged successfully."); }
     catch (e: any) { Alert.alert("Merge", e.message) }
   };
 
@@ -162,7 +164,6 @@ export default function GuestsScreen() {
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.8,
-        base64: true,
       };
 
       const result = source === "camera"
@@ -174,19 +175,23 @@ export default function GuestsScreen() {
       }
 
       const asset = result.assets[0];
-      if (!asset.base64) {
-        Alert.alert("Error", "Could not process selected image.");
+      if (!asset.uri) {
+        Alert.alert("Error", "Could not access the selected image.");
         return;
       }
 
       const mimeType = asset.mimeType || "image/jpeg";
-      const photo_base64 = asset.base64.startsWith("data:")
-        ? asset.base64
-        : `data:${mimeType};base64,${asset.base64}`;
+      const extension = mimeType.split("/")[1] || "jpg";
+      const formData = new FormData();
+      formData.append("photo", {
+        uri: asset.uri,
+        name: asset.fileName || `guest-${id}.${extension}`,
+        type: mimeType,
+      } as any);
 
       setUpdatingPhoto(id);
 
-      await guestsApi.replacePhoto(id, { photo_base64 });
+      await guestsApi.replacePhoto(id, formData);
 
       const now = Date.now();
       setGuests(prev => prev.map(item => {
@@ -288,7 +293,7 @@ export default function GuestsScreen() {
           disabled={isUpdating}
           onPress={() => promptReplacePhoto(g)}
         />
-        <ActionButton label="Merge" icon="git-merge-outline" color={colors.purple} onPress={() => { setSelected(g); setExistingId(""); setModal("merge") }} />
+        <ActionButton label="Merge" icon="git-merge-outline" color={colors.purple} onPress={() => { setSelected(g); setExistingId(""); setPhone(""); setForceMerge(true); setModal("merge") }} />
         {g.currently_at_table ? (
           <ActionButton label="Release" icon="log-out-outline" color={colors.red} onPress={() => releaseGuest(g)} />
         ) : (
@@ -410,6 +415,11 @@ export default function GuestsScreen() {
         </> : <>
           <Text style={styles.hint}>Only a pending guest can be merged. Enter the existing guest ID to keep.</Text>
           <TextInput value={existingId} onChangeText={setExistingId} placeholder="guest012" style={styles.input} />
+          <Text style={styles.label}>Phone</Text><TextInput value={phone} onChangeText={setPhone} keyboardType="phone-pad" maxLength={10} placeholder="9876543210" style={styles.input} />
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+            <Text style={styles.label}>Force merge</Text>
+            <Switch value={forceMerge} onValueChange={setForceMerge} />
+          </View>
           <TouchableOpacity style={styles.primaryBtn} onPress={merge}><Text style={styles.primaryText}>Merge Guest</Text></TouchableOpacity>
         </>}
       </View></View>
@@ -420,8 +430,8 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   content: { flex: 1 },
   sync: { width: 43, height: 43, borderRadius: 22, backgroundColor: "rgba(255,255,255,.15)", alignItems: "center", justifyContent: "center" },
-  search: { margin: 16, marginBottom: 12, height: 56, borderRadius: 29, backgroundColor: "#fff", borderWidth: 1, borderColor: colors.border, flexDirection: "row", alignItems: "center", paddingHorizontal: 18, shadowColor: "#000", shadowOpacity: .02, shadowRadius: 6, elevation: 1 },
-  searchInput: { flex: 1, fontSize: 12, color: colors.text, marginLeft: 8 },
+  search: { margin: 16, marginBottom: 12, height: 46, borderRadius: 29, backgroundColor: "#fff", borderWidth: 1, borderColor: colors.border, flexDirection: "row", alignItems: "center", paddingHorizontal: 18, shadowColor: "#000", shadowOpacity: .02, shadowRadius: 6, elevation: 1 },
+  searchInput: { flex: 1, fontSize: 13, color: colors.text, marginLeft: 8 },
   tabsScrollView: { flexGrow: 0, flexShrink: 0, marginBottom: 8 },
   tabs: { paddingHorizontal: 16, gap: 8, paddingVertical: 4, alignItems: "center" },
   tab: { flexDirection: "row", alignItems: "center", paddingHorizontal: 14, paddingVertical: 8, borderRadius: 22, borderWidth: 1.5, gap: 6 },
@@ -455,3 +465,4 @@ const styles = StyleSheet.create({
   primaryText: { color: "#fff", fontSize: 16, fontWeight: "900" },
   hint: { color: colors.muted, fontSize: 13, lineHeight: 19, marginTop: 10, marginBottom: 10 }
 });
+  

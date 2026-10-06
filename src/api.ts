@@ -62,8 +62,8 @@ export const guestsApi = {
     api(`/guests`, { method: "POST", body: { guest_id: id, ...body } }),
   manual: (name: string, phone: string) =>
     api(`/guests/manual`, { method: "POST", body: { name, phone } }),
-  merge: (id: string, existing_guest_id: string) =>
-    api(`/guests/${id}/merge`, { method: "POST", body: { existing_guest_id } }),
+  merge: (id: string, body: { existing_guest_id: string; force: boolean; phone: string }) =>
+    api(`/guests/${id}/merge`, { method: "POST", body }),
   optIn: (id: string, body?: { phone?: string; name?: string }) =>
     api(`/guests/${id}/opt-in`, { method: "POST", body }),
   verifyOtp: (id: string, otp: string) =>
@@ -75,7 +75,7 @@ export const guestsApi = {
   visitsByPhone: (phone: string, query = "") =>
     api(`/guests/phone/${encodeURIComponent(phone)}/visits${query}`),
   photo: (id: string) => photoUrl(id),
-  replacePhoto: (id: string, body: any) =>
+  replacePhoto: (id: string, body: FormData) =>
     api(`/guests/${id}/photo`, { method: "PUT", body }),
 };
 
